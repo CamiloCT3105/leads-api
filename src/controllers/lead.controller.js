@@ -149,7 +149,7 @@ exports.aiSummary = async (req, res) => {
 
     const leads = await Lead.find(filter);
 
-    const summary = generateSummary(leads);
+    const summary = await generateSummary(leads);
 
     res.json({ summary });
   } catch (error) {
