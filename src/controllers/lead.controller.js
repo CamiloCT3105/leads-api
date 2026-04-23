@@ -61,3 +61,34 @@ exports.deleteLead = async (req, res) => {
 
   res.json({ message: 'Lead eliminado' });
 };
+
+// GET STATS
+exports.getStats = async (req, res) => {
+  try {
+    const total = await Lead.countDocuments({ deleted: false });
+
+    const byFuente = await Lead.aggregate([
+      { $match: { deleted: false } },
+      { $group: { _id: "$fuente", count: { $sum: 1 } } }
+    ]);
+
+    const avgBudget = await Lead.aggregate([
+      { $match: { deleted: false } },
+      { $group: { _id: null, avg: { $avg: "$presupuesto" } } }
+    ]);
+
+    const last7Days = await Lead.countDocuments({
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      deleted: false
+    });
+
+    res.json({
+      total,
+      byFuente,
+      avgBudget: avgBudget[0]?.avg || 0,
+      last7Days
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
