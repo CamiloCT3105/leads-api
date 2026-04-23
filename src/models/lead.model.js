@@ -4,12 +4,13 @@ const leadSchema = new mongoose.Schema({
   nombre: {
     type: String,
     required: true,
-    minlength: 2
+    minlength: [2, 'El nombre debe tener al menos 2 caracteres']
   },
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    match: [/^\S+@\S+\.\S+$/, 'Email inválido']
   },
   telefono: String,
   fuente: {

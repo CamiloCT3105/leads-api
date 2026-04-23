@@ -1,12 +1,20 @@
 const Lead = require('../models/lead.model');
+const { handleError } = require('../utils/errorHandler');
 
 // CREATE
 exports.createLead = async (req, res) => {
   try {
+    const allowed = ['instagram', 'facebook', 'landing_page', 'referido', 'otro'];
+
+    if (!allowed.includes(req.body.fuente)) {
+    return res.status(400).json({ message: 'Fuente inválida' });
+    }
+
     const lead = await Lead.create(req.body);
     res.status(201).json(lead);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    const err = handleError(error);
+    res.status(400).json(err);
   }
 };
 
@@ -26,12 +34,19 @@ exports.getLeads = async (req, res) => {
       };
     }
 
-    const leads = await Lead.find(filter)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
+    const total = await Lead.countDocuments(filter);
 
-    res.json(leads);
+    const leads = await Lead.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(Number(limit));
+
+    res.json({
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        data: leads
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -50,14 +65,35 @@ exports.getLeadById = async (req, res) => {
 
 // UPDATE
 exports.updateLead = async (req, res) => {
-  const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  try {
+    const lead = await Lead.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
 
-  res.json(lead);
+    if (!lead || lead.deleted) {
+      return res.status(404).json({ message: 'Lead no encontrado' });
+    }
+
+    res.json(lead);
+  } catch (error) {
+    const err = handleError(error);
+    res.status(400).json(err);
+  }
 };
 
 // DELETE (soft)
 exports.deleteLead = async (req, res) => {
-  await Lead.findByIdAndUpdate(req.params.id, { deleted: true });
+  const lead = await Lead.findByIdAndUpdate(
+    req.params.id,
+    { deleted: true },
+    { new: true }
+  );
+
+  if (!lead) {
+    return res.status(404).json({ message: 'Lead no encontrado' });
+  }
 
   res.json({ message: 'Lead eliminado' });
 };
@@ -97,9 +133,26 @@ exports.getStats = async (req, res) => {
 const { generateSummary } = require('../services/ai.service.JS');
 
 exports.aiSummary = async (req, res) => {
-  const leads = await Lead.find({ deleted: false });
+  try {
+    const { fuente, startDate, endDate } = req.body;
 
-  const summary = generateSummary(leads);
+    let filter = { deleted: false };
 
-  res.json({ summary });
+    if (fuente) filter.fuente = fuente;
+
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const leads = await Lead.find(filter);
+
+    const summary = generateSummary(leads);
+
+    res.json({ summary });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
