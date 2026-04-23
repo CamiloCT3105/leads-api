@@ -92,3 +92,14 @@ exports.getStats = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+//IA - MOCK
+const { generateSummary } = require('../services/ai.service.JS');
+
+exports.aiSummary = async (req, res) => {
+  const leads = await Lead.find({ deleted: false });
+
+  const summary = generateSummary(leads);
+
+  res.json({ summary });
+};
